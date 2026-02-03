@@ -1,43 +1,47 @@
-import React, { useState, useEffect } from 'react';
+const { sql } = require('@vercel/postgres');
+const express = require('express');
+const app = express();
 
-function App() {
-    const [tasks, setTasks] = useState([]);
-    const [input, setInput] = useState('');
+app.use(express.json());
 
-    useEffect(() => {
-        fetch('/api/tasks')
-            .then(res => res.json())
-            .then(data => setTasks(data))
-            .catch(err => console.error(err));
-    }, []);
+// Маршрут для получения всех задач
+app.get('/api/tasks', async (req, res) => {
+    try {
+        const { rows } = await sql`SELECT * FROM tasks ORDER BY id DESC;`;
+        res.json(rows);
+    } catch (error) {
+        console.error('GET Error:', error.message);
+        res.status(500).json({ error: 'Database error', details: error.message });
+    }
+});
 
-    const addTask = async () => {
-        if (!input) return;
-        await fetch('/api/tasks', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: input }),
+// Маршрут для создания задачи
+app.post('/api/tasks', async (req, res) => {
+    try {
+        const { title } = req.body;
+        console.log('Received title:', title); // Проверка входящих данных
+
+        if (!title) {
+            return res.status(400).json({ error: 'Title is required' });
+        }
+
+        // Вставка в таблицу tasks
+        const result = await sql`
+      INSERT INTO tasks (title) 
+      VALUES (${title}) 
+      RETURNING *;
+    `;
+
+        console.log('Success:', result.rows[0]);
+        res.status(201).json(result.rows[0]);
+    } catch (error) {
+        console.error('POST Error:', error.message);
+        res.status(500).json({
+            error: 'Database error',
+            details: error.message,
+            hint: 'Make sure table "tasks" exists in Vercel Postgres Storage'
         });
-        setInput('');
-        window.location.reload(); // Для простоты обновляем страницу
-    };
+    }
+});
 
-    return (
-        <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
-            <h1>Vercel Postgres + CRA</h1>
-            <input
-                value={input}
-                onChange={(e) => setInput(e.target.e.target.value)}
-                placeholder="New task..."
-            />
-            <button onClick={addTask}>Add</button>
-            <ul>
-                {tasks.map(task => (
-                    <li key={task.id}>{task.title}</li>
-                ))}
-            </ul>
-        </div>
-    );
-}
-
-export default App;
+module.exports = app;
