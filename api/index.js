@@ -18,5 +18,16 @@ app.post('/api/tasks', async (req, res) => {
     res.json(result.rows[0]);
 });
 
+// Удаление задачи
+app.delete('/api/tasks/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        await sql`DELETE FROM tasks WHERE id = ${id};`;
+        res.status(200).json({ message: 'Deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // 4. Обязательно для Vercel: экспорт приложения
 module.exports = app;
